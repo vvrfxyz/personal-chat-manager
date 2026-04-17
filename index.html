@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personal Chat Manager</title>
+    <meta
+      name="description"
+      content="A lightweight personal dashboard for organizing conversations, filtering chats, and reviewing message context."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-glow page-glow-left"></div>
+    <div class="page-glow page-glow-right"></div>
+
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Personal productivity project</p>
+        <h1>Personal Chat Manager</h1>
+        <p class="lede">
+          A simple personal-use app concept for reviewing message history,
+          searching conversations, and keeping daily communication organized.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#dashboard">Explore Demo</a>
+          <a
+            class="button button-secondary"
+            href="https://github.com/vvrfxyz/personal-chat-manager"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View Repository
+          </a>
+        </div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-card-top">
+          <span>Today's focus</span>
+          <span>3 pinned chats</span>
+        </div>
+        <div class="hero-stat-grid">
+          <article>
+            <strong>24</strong>
+            <span>Chats tracked</span>
+          </article>
+          <article>
+            <strong>7</strong>
+            <span>Unread items</span>
+          </article>
+          <article>
+            <strong>5</strong>
+            <span>Priority labels</span>
+          </article>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="feature-strip" aria-label="Feature summary">
+        <article>
+          <h2>Search quickly</h2>
+          <p>Look through recent chats and jump into the right thread fast.</p>
+        </article>
+        <article>
+          <h2>Tag by intent</h2>
+          <p>Separate personal, work, reading, and follow-up conversations.</p>
+        </article>
+        <article>
+          <h2>Review context</h2>
+          <p>Keep recent message summaries visible before replying.</p>
+        </article>
+      </section>
+
+      <section class="dashboard" id="dashboard">
+        <div class="dashboard-head">
+          <div>
+            <p class="eyebrow">Interactive mockup</p>
+            <h2>Conversation overview</h2>
+          </div>
+          <p class="dashboard-note">
+            The sample below runs entirely in the browser with local demo data.
+          </p>
+        </div>
+
+        <div class="workspace">
+          <aside class="workspace-panel workspace-panel-left">
+            <label class="search">
+              <span>Search chats</span>
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Search by name, note, or topic"
+              />
+            </label>
+
+            <div class="filter-group">
+              <p>Filter by label</p>
+              <div class="chip-row" id="filterChips" role="tablist"></div>
+            </div>
+
+            <div class="chat-list-wrap">
+              <div class="list-header">
+                <span>Chats</span>
+                <span id="chatCount">0 items</span>
+              </div>
+              <div id="chatList" class="chat-list" role="list"></div>
+            </div>
+          </aside>
+
+          <section class="workspace-panel workspace-panel-right" aria-live="polite">
+            <div id="chatDetail" class="chat-detail"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="project-copy">
+        <div>
+          <p class="eyebrow">Suggested project description</p>
+          <h2>Useful for a Telegram API application page</h2>
+        </div>
+        <p>
+          Personal Chat Manager is a personal communication and productivity
+          tool for organizing chats, reviewing conversation history, and
+          improving message workflow efficiency.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Personal Chat Manager</p>
+      <p>Simple static demo for GitHub and Telegram API application details.</p>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
