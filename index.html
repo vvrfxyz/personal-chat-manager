@@ -1,144 +1,742 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Personal Chat Manager</title>
+    <title>Signal Desk · Personal Chat Manager</title>
     <meta
       name="description"
-      content="A lightweight personal dashboard for organizing conversations, filtering chats, and reviewing message context."
+      content="Personal Chat Manager MVP — 绑定 Telegram，选择聊天，让 AI 自动生成增量报告。数据本地存储可查。"
     />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+            animation: {
+              "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+              rise: "rise 0.4s ease-out both",
+              "slide-up": "slide-up 0.3s ease-out both",
+            },
+            keyframes: {
+              "pulse-soft": {
+                "0%, 100%": { opacity: 1 },
+                "50%": { opacity: 0.45 },
+              },
+              rise: {
+                "0%": { opacity: 0, transform: "translateY(6px)" },
+                "100%": { opacity: 1, transform: "translateY(0)" },
+              },
+              "slide-up": {
+                "0%": { opacity: 0, transform: "translateY(12px)" },
+                "100%": { opacity: 1, transform: "translateY(0)" },
+              },
+            },
+          },
+        },
+      };
+    </script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <div class="page-glow page-glow-left"></div>
-    <div class="page-glow page-glow-right"></div>
+  <body class="bg-zinc-950 text-zinc-100 font-sans antialiased min-h-screen selection:bg-sky-500/25">
+    <!-- Ambient background -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+      <div class="absolute -top-40 -left-40 w-[520px] h-[520px] rounded-full bg-sky-500/10 blur-[120px]"></div>
+      <div class="absolute top-1/3 -right-40 w-[520px] h-[520px] rounded-full bg-violet-500/10 blur-[120px]"></div>
+      <div class="absolute inset-0 bg-grid opacity-[0.35]"></div>
+    </div>
 
-    <header class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Personal productivity project</p>
-        <h1>Personal Chat Manager</h1>
-        <p class="lede">
-          A simple personal-use app concept for reviewing message history,
-          searching conversations, and keeping daily communication organized.
-        </p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="#dashboard">Explore Demo</a>
-          <a
-            class="button button-secondary"
-            href="https://github.com/vvrfxyz/personal-chat-manager"
-            target="_blank"
-            rel="noreferrer"
+    <!-- ============ LOGIN VIEW ============ -->
+    <main id="loginView" class="view min-h-screen grid place-items-center px-4 py-12">
+      <div class="w-full max-w-md animate-rise">
+        <div class="text-center mb-8">
+          <div
+            class="inline-flex items-center gap-2 mb-5 px-3 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 backdrop-blur"
           >
-            View Repository
-          </a>
-        </div>
-      </div>
-
-      <div class="hero-card">
-        <div class="hero-card-top">
-          <span>Today's focus</span>
-          <span>3 pinned chats</span>
-        </div>
-        <div class="hero-stat-grid">
-          <article>
-            <strong>24</strong>
-            <span>Chats tracked</span>
-          </article>
-          <article>
-            <strong>7</strong>
-            <span>Unread items</span>
-          </article>
-          <article>
-            <strong>5</strong>
-            <span>Priority labels</span>
-          </article>
-        </div>
-      </div>
-    </header>
-
-    <main>
-      <section class="feature-strip" aria-label="Feature summary">
-        <article>
-          <h2>Search quickly</h2>
-          <p>Look through recent chats and jump into the right thread fast.</p>
-        </article>
-        <article>
-          <h2>Tag by intent</h2>
-          <p>Separate personal, work, reading, and follow-up conversations.</p>
-        </article>
-        <article>
-          <h2>Review context</h2>
-          <p>Keep recent message summaries visible before replying.</p>
-        </article>
-      </section>
-
-      <section class="dashboard" id="dashboard">
-        <div class="dashboard-head">
-          <div>
-            <p class="eyebrow">Interactive mockup</p>
-            <h2>Conversation overview</h2>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-soft"></span>
+            Personal Chat Manager · MVP
           </div>
-          <p class="dashboard-note">
-            The sample below runs entirely in the browser with local demo data.
+          <h1 class="text-3xl font-semibold tracking-tight mb-2">欢迎回来</h1>
+          <p class="text-zinc-400 text-sm">
+            绑定 Telegram 账号，开始自动整理你关心的对话。
           </p>
         </div>
 
-        <div class="workspace">
-          <aside class="workspace-panel workspace-panel-left">
-            <label class="search">
-              <span>Search chats</span>
-              <input
-                id="searchInput"
-                type="search"
-                placeholder="Search by name, note, or topic"
-              />
-            </label>
-
-            <div class="filter-group">
-              <p>Filter by label</p>
-              <div class="chip-row" id="filterChips" role="tablist"></div>
-            </div>
-
-            <div class="chat-list-wrap">
-              <div class="list-header">
-                <span>Chats</span>
-                <span id="chatCount">0 items</span>
+        <div
+          class="bg-zinc-900/60 backdrop-blur-xl border border-zinc-800 rounded-2xl p-6 shadow-2xl shadow-black/40"
+        >
+          <!-- Stepper -->
+          <div class="flex items-center gap-3 mb-6">
+            <div id="step1Indicator" class="flex items-center gap-2">
+              <div
+                class="w-7 h-7 rounded-full bg-sky-500 text-white grid place-items-center text-xs font-semibold shadow-lg shadow-sky-500/30"
+              >
+                1
               </div>
-              <div id="chatList" class="chat-list" role="list"></div>
+              <span class="text-xs font-medium text-zinc-200">手机号</span>
             </div>
-          </aside>
+            <div class="flex-1 h-px bg-gradient-to-r from-sky-500/40 via-zinc-800 to-zinc-800"></div>
+            <div id="step2Indicator" class="flex items-center gap-2 opacity-50 transition">
+              <div
+                class="w-7 h-7 rounded-full bg-zinc-800 text-zinc-400 grid place-items-center text-xs font-semibold"
+              >
+                2
+              </div>
+              <span class="text-xs font-medium text-zinc-400">验证码</span>
+            </div>
+          </div>
 
-          <section class="workspace-panel workspace-panel-right" aria-live="polite">
-            <div id="chatDetail" class="chat-detail"></div>
-          </section>
-        </div>
-      </section>
+          <!-- Step 1 -->
+          <div id="loginStep1" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-zinc-200 mb-2">Telegram 手机号</label>
+              <div class="grid grid-cols-[10.5rem_1fr] gap-2">
+                <select
+                  id="countryCode"
+                  class="px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition"
+                >
+                  <option value="+86">+86 中国大陆</option>
+                  <option value="+852">+852 香港</option>
+                  <option value="+853">+853 澳门</option>
+                  <option value="+886">+886 台湾</option>
+                  <option value="+65">+65 新加坡</option>
+                  <option value="+81">+81 日本</option>
+                  <option value="+82">+82 韩国</option>
+                  <option value="+1">+1 美国/加拿大</option>
+                  <option value="+44">+44 英国</option>
+                  <option value="+91">+91 印度</option>
+                </select>
+                <input
+                  id="phoneInput"
+                  type="tel"
+                  autocomplete="tel-national"
+                  placeholder="138 0000 0000"
+                  class="px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition"
+                />
+              </div>
+              <p class="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">
+                <i data-lucide="info" class="w-3 h-3"></i>
+                我们会向这个号码发送 5 位验证码
+              </p>
+            </div>
 
-      <section class="project-copy">
-        <div>
-          <p class="eyebrow">Suggested project description</p>
-          <h2>Useful for a Telegram API application page</h2>
+            <button
+              id="sendCodeBtn"
+              type="button"
+              class="w-full py-2.5 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-progress shadow-lg shadow-sky-500/20"
+            >
+              <span>发送验证码</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Step 2 -->
+          <div id="loginStep2" class="space-y-4 hidden">
+            <div>
+              <label class="block text-sm font-medium text-zinc-200 mb-2">验证码</label>
+              <input
+                id="codeInput"
+                type="text"
+                maxlength="5"
+                inputmode="numeric"
+                pattern="\d{5}"
+                autocomplete="one-time-code"
+                placeholder="·····"
+                class="w-full px-3 py-3 bg-zinc-950 border border-zinc-800 rounded-lg text-center text-2xl tracking-[0.6em] font-mono focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition"
+              />
+              <p class="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">
+                <i data-lucide="send" class="w-3 h-3"></i>
+                <span>已发送至 <strong id="codeHintPhone" class="text-zinc-300 font-medium"></strong></span>
+                <button
+                  id="resendBtn"
+                  type="button"
+                  class="text-sky-400 hover:text-sky-300 ml-auto"
+                >
+                  重新发送
+                </button>
+              </p>
+            </div>
+
+            <details class="group">
+              <summary
+                class="cursor-pointer text-sm text-zinc-400 hover:text-zinc-200 flex items-center gap-2 list-none select-none"
+              >
+                <i data-lucide="chevron-right" class="w-4 h-4 group-open:rotate-90 transition-transform"></i>
+                <span>已开启两步验证？输入云密码</span>
+              </summary>
+              <input
+                id="twofaInput"
+                type="password"
+                autocomplete="current-password"
+                placeholder="2FA 云密码"
+                class="mt-3 w-full px-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20 transition"
+              />
+            </details>
+
+            <div class="flex items-center gap-3">
+              <button
+                id="backToPhoneBtn"
+                type="button"
+                class="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-sm font-medium rounded-lg transition"
+              >
+                返回
+              </button>
+              <button
+                id="confirmCodeBtn"
+                type="button"
+                class="flex-1 py-2.5 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white text-sm font-medium rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-progress shadow-lg shadow-sky-500/20"
+              >
+                <span>确认登录</span>
+                <i data-lucide="check" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="loginError"
+            class="mt-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-sm text-rose-300 hidden items-center gap-2"
+            role="alert"
+          >
+            <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+            <span id="loginErrorMsg"></span>
+          </div>
         </div>
-        <p>
-          Personal Chat Manager is a personal communication and productivity
-          tool for organizing chats, reviewing conversation history, and
-          improving message workflow efficiency.
-        </p>
-      </section>
+
+        <div class="mt-6 grid gap-1.5">
+          <div class="flex items-start gap-2 text-xs text-zinc-500">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 mt-0.5 text-emerald-400 flex-shrink-0"></i>
+            <span>只读取你账号能看到的对话，随时断开</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-zinc-500">
+            <i data-lucide="lock" class="w-3.5 h-3.5 mt-0.5 text-emerald-400 flex-shrink-0"></i>
+            <span>会话凭据加密存储，原始消息短期使用</span>
+          </div>
+          <div class="flex items-start gap-2 text-xs text-zinc-500">
+            <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 text-zinc-500 flex-shrink-0"></i>
+            <span>演示模式：任意 5 位数字即可登录</span>
+          </div>
+        </div>
+      </div>
     </main>
 
-    <footer class="footer">
-      <p>Personal Chat Manager</p>
-      <p>Simple static demo for GitHub and Telegram API application details.</p>
-    </footer>
+    <!-- ============ WORKSPACE VIEW ============ -->
+    <div id="workspaceView" class="view hidden">
+      <!-- Topbar -->
+      <header class="sticky top-0 z-30 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
+        <div class="max-w-[1440px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-6">
+          <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <button
+              id="sidebarToggleBtn"
+              type="button"
+              title="聊天列表"
+              class="lg:hidden w-9 h-9 grid place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+            >
+              <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <div
+              class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-500 grid place-items-center shadow-lg shadow-sky-500/25 flex-shrink-0"
+            >
+              <i data-lucide="message-square-quote" class="w-4 h-4 text-white"></i>
+            </div>
+            <div class="hidden md:block">
+              <h1 class="text-sm font-semibold leading-tight">Signal Desk</h1>
+              <p class="text-[10px] text-zinc-500 uppercase tracking-wider leading-tight">
+                Personal Chat Manager
+              </p>
+            </div>
+          </div>
 
+          <div class="flex-1 min-w-0 max-w-md">
+            <div class="relative">
+              <i
+                data-lucide="search"
+                class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+              ></i>
+              <input
+                id="searchInput"
+                placeholder="搜索聊天..."
+                class="w-full pl-9 pr-3 sm:pr-16 py-1.5 text-sm bg-zinc-900/60 border border-zinc-800 rounded-lg focus:border-sky-500/40 focus:outline-none focus:ring-2 focus:ring-sky-500/10 placeholder:text-zinc-600 transition"
+              />
+              <kbd
+                class="hidden sm:block absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800 rounded"
+              >⌘K</kbd>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+            <div class="relative">
+              <button
+                id="activeRunsChip"
+                type="button"
+                class="hidden items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/30 text-xs text-sky-300 hover:bg-sky-500/15 transition"
+                title="正在运行的任务"
+              >
+                <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>
+                <span id="activeRunsChipText">0 个任务运行中</span>
+              </button>
+              <div
+                id="activeRunsPanel"
+                class="hidden absolute right-0 top-9 w-80 max-h-96 overflow-auto bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl z-40"
+              ></div>
+            </div>
+            <div
+              id="sessionChip"
+              class="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-soft"></span>
+              <span id="sessionChipText">连接正常</span>
+            </div>
+            <button
+              id="dataBtn"
+              type="button"
+              class="hidden sm:grid w-9 h-9 place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+              title="查看数据库"
+            >
+              <i data-lucide="database" class="w-4 h-4"></i>
+            </button>
+            <button
+              id="dialogsBtn"
+              type="button"
+              class="hidden sm:grid w-9 h-9 place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+              title="对话管理（批量退群/删私聊）"
+            >
+              <i data-lucide="list-checks" class="w-4 h-4"></i>
+            </button>
+            <button
+              id="cleanupBtn"
+              type="button"
+              class="hidden sm:grid w-9 h-9 place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+              title="清理已删账号（Deleted Account）"
+            >
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+            <button
+              id="syncBtn"
+              type="button"
+              class="hidden sm:grid w-9 h-9 place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+              title="重新同步"
+            >
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+
+            <div class="sm:hidden relative">
+              <button
+                id="mobileMenuBtn"
+                type="button"
+                class="w-9 h-9 grid place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-zinc-100"
+                title="更多"
+              >
+                <i data-lucide="more-vertical" class="w-5 h-5"></i>
+              </button>
+              <div id="mobileMenu" class="hidden absolute right-0 top-11 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl z-30 py-1">
+                <button data-mobile-action="sync" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition">
+                  <i data-lucide="refresh-cw" class="w-4 h-4 text-zinc-400"></i>重新同步
+                </button>
+                <button data-mobile-action="dialogs" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition">
+                  <i data-lucide="list-checks" class="w-4 h-4 text-zinc-400"></i>对话管理
+                </button>
+                <button data-mobile-action="cleanup" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition">
+                  <i data-lucide="trash-2" class="w-4 h-4 text-zinc-400"></i>清理已删账号
+                </button>
+                <button data-mobile-action="data" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition">
+                  <i data-lucide="database" class="w-4 h-4 text-zinc-400"></i>查看数据库
+                </button>
+                <div class="h-px bg-zinc-800 my-1"></div>
+                <button data-mobile-action="disconnect" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-rose-300 hover:bg-zinc-800 transition">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>断开账号
+                </button>
+              </div>
+            </div>
+
+            <div class="hidden sm:block w-px h-5 bg-zinc-800 mx-1"></div>
+            <div
+              id="accountAvatar"
+              class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 grid place-items-center text-xs font-semibold text-white shadow flex-shrink-0"
+            ></div>
+            <button
+              id="disconnectBtn"
+              type="button"
+              class="hidden sm:grid w-9 h-9 place-items-center rounded-lg hover:bg-zinc-900 transition text-zinc-400 hover:text-rose-300"
+              title="断开账号"
+            >
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Mobile sidebar backdrop -->
+      <div id="sidebarBackdrop" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"></div>
+
+      <div class="max-w-[1440px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div class="lg:grid lg:grid-cols-[340px_1fr] lg:gap-6">
+          <!-- Sidebar: fixed drawer on <lg, inline on lg+ -->
+          <aside id="sidebar" class="sidebar-drawer hidden lg:block lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 no-scrollbar space-y-4">
+            <div class="lg:hidden flex items-center justify-between mb-2">
+              <h2 class="text-sm font-semibold text-zinc-200">聊天列表</h2>
+              <button id="sidebarCloseBtn" type="button" class="w-8 h-8 grid place-items-center rounded-md hover:bg-zinc-800 text-zinc-400">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div
+              class="bg-gradient-to-br from-zinc-900 to-zinc-900/40 border border-zinc-800 rounded-xl p-4"
+            >
+              <div class="flex items-center gap-3">
+                <div
+                  id="accountAvatarBig"
+                  class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-rose-500 grid place-items-center text-sm font-semibold text-white shadow-lg"
+                ></div>
+                <div class="min-w-0 flex-1">
+                  <h2 id="accountName" class="text-sm font-semibold truncate"></h2>
+                  <p id="accountMeta" class="text-xs text-zinc-500 truncate"></p>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2 mt-4">
+                <div class="bg-zinc-950/50 border border-zinc-800 rounded-lg p-2.5 text-center">
+                  <div id="totalChats" class="text-base font-semibold">0</div>
+                  <div class="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">同步</div>
+                </div>
+                <div class="bg-zinc-950/50 border border-zinc-800 rounded-lg p-2.5 text-center">
+                  <div id="autoChats" class="text-base font-semibold text-sky-400">0</div>
+                  <div class="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">自动</div>
+                </div>
+                <div class="bg-zinc-950/50 border border-zinc-800 rounded-lg p-2.5 text-center">
+                  <div id="totalReports" class="text-base font-semibold text-emerald-400">0</div>
+                  <div class="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">报告</div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="flex gap-0.5 p-1 bg-zinc-900/50 border border-zinc-800 rounded-lg"
+              id="filterBar"
+            ></div>
+
+            <div class="flex items-center justify-between px-1 pt-2">
+              <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">聊天源</h3>
+              <span id="sourceCount" class="text-xs text-zinc-500 font-mono">0</span>
+            </div>
+
+            <div id="sourceList" class="space-y-2"></div>
+          </aside>
+
+          <!-- Content -->
+          <section class="space-y-4 min-w-0">
+            <div
+              id="heroCard"
+              class="bg-gradient-to-br from-zinc-900 to-zinc-900/40 border border-zinc-800 rounded-2xl p-6 animate-slide-up"
+            ></div>
+
+            <div
+              id="configCard"
+              class="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 animate-slide-up"
+            ></div>
+
+            <div class="bg-zinc-900/30 border border-zinc-800 rounded-2xl animate-slide-up">
+              <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-4 h-4 text-zinc-500"></i>
+                    <span id="reportsTitle">历史报告</span>
+                  </h3>
+                  <p id="reportsHint" class="text-xs text-zinc-500 mt-0.5"></p>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                  最新在前
+                </div>
+              </div>
+              <div id="reportList" class="p-3 space-y-2"></div>
+            </div>
+
+            <div id="reportDetailCard"></div>
+
+            <div class="bg-zinc-900/30 border border-zinc-800 rounded-2xl animate-slide-up">
+              <button
+                id="runsHeaderBtn"
+                type="button"
+                class="w-full px-5 py-4 flex items-center justify-between hover:bg-zinc-900/30 transition text-left"
+              >
+                <div>
+                  <h3 class="text-sm font-semibold flex items-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4 text-zinc-500"></i>
+                    <span>运行历史</span>
+                  </h3>
+                  <p id="runsHint" class="text-xs text-zinc-500 mt-0.5">点击展开</p>
+                </div>
+                <i
+                  data-lucide="chevron-down"
+                  id="runsChevron"
+                  class="w-4 h-4 text-zinc-500 transition-transform -rotate-90"
+                ></i>
+              </button>
+              <div id="runsList" class="p-3 pt-0 space-y-1.5 hidden"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Modal -->
+    <div
+      id="dataModal"
+      class="hidden fixed inset-0 z-50 grid place-items-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-modal-close></div>
+      <div
+        class="relative w-full max-w-3xl max-h-[calc(100vh-2rem)] flex flex-col bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-up"
+      >
+        <div class="flex items-center justify-between gap-4 p-5 border-b border-zinc-800">
+          <div>
+            <h2 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="database" class="w-4 h-4 text-sky-400"></i>
+              本地数据库快照
+            </h2>
+            <p class="text-xs text-zinc-500 mt-0.5">localStorage key · pcm:state:v1</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              id="copyDataBtn"
+              type="button"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-medium rounded-md transition flex items-center gap-1.5"
+            >
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>复制 JSON</span>
+            </button>
+            <button
+              data-modal-close
+              type="button"
+              class="w-8 h-8 grid place-items-center rounded-md hover:bg-zinc-800 transition text-zinc-400"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <div
+          id="dataTabs"
+          class="flex gap-1 p-3 border-b border-zinc-800 overflow-x-auto no-scrollbar"
+        ></div>
+        <pre
+          id="dataView"
+          class="flex-1 overflow-auto p-5 font-mono text-xs text-zinc-300 bg-zinc-950/50 leading-relaxed"
+        ></pre>
+      </div>
+    </div>
+
+    <!-- Range-run modal -->
+    <div
+      id="rangeModal"
+      class="hidden fixed inset-0 z-50 grid place-items-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-range-close></div>
+      <div
+        class="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-6 animate-slide-up"
+      >
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="calendar-range" class="w-4 h-4 text-sky-400"></i>
+              历史快照
+            </h2>
+            <p class="text-xs text-zinc-500 mt-0.5">对指定时间范围跑一份独立报告</p>
+          </div>
+          <button
+            data-range-close
+            type="button"
+            class="w-8 h-8 grid place-items-center rounded-md hover:bg-zinc-800 transition text-zinc-400"
+          >
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="p-3 mb-4 rounded-lg bg-zinc-950/60 border border-zinc-800 text-[11px] text-zinc-400 leading-relaxed">
+          <div class="flex items-start gap-2">
+            <i data-lucide="info" class="w-3.5 h-3.5 text-zinc-500 mt-0.5 flex-shrink-0"></i>
+            <div>
+              和主按钮的区别：这里生成的报告是<strong class="text-zinc-200">独立快照</strong>，
+              <strong class="text-zinc-200">不会推进游标</strong>、也不会重置自动调度。<br>
+              适合：查看历史某段时间、跳过 backlog 直接看最近、跑对比报告。
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">快速范围</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button data-range-preset="last_1h" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">最近 1 小时</button>
+            <button data-range-preset="last_6h" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">最近 6 小时</button>
+            <button data-range-preset="today" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">今天</button>
+            <button data-range-preset="yesterday" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">昨天</button>
+            <button data-range-preset="last_24h" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">最近 24 小时</button>
+            <button data-range-preset="last_7d" class="px-3 py-2 bg-zinc-800 hover:bg-sky-500 hover:text-white border border-zinc-700 text-zinc-200 text-xs font-medium rounded-lg transition">最近 7 天</button>
+          </div>
+        </div>
+
+        <div class="border-t border-zinc-800 pt-4 mt-5">
+          <label class="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">自定义范围</label>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <p class="text-[10px] text-zinc-500 mb-1">From</p>
+              <input id="rangeFromInput" type="datetime-local" class="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-sm focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20" />
+            </div>
+            <div>
+              <p class="text-[10px] text-zinc-500 mb-1">To (留空 = 现在)</p>
+              <input id="rangeToInput" type="datetime-local" class="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-sm focus:border-sky-500/60 focus:outline-none focus:ring-2 focus:ring-sky-500/20" />
+            </div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button data-range-close type="button" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-medium rounded-md transition">取消</button>
+            <button id="rangeCustomBtn" type="button" class="px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-white text-xs font-medium rounded-md transition shadow-lg shadow-sky-500/20">应用自定义范围</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompt template viewer modal -->
+    <div
+      id="templateModal"
+      class="hidden fixed inset-0 z-50 grid place-items-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-template-close></div>
+      <div
+        class="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-up"
+      >
+        <header class="flex items-start justify-between gap-4 p-5 border-b border-zinc-800">
+          <div class="min-w-0">
+            <h2 id="templateModalTitle" class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i>
+              <span>提示词模板</span>
+            </h2>
+            <p id="templateModalDesc" class="text-xs text-zinc-500 mt-0.5"></p>
+          </div>
+          <button
+            data-template-close
+            type="button"
+            class="w-8 h-8 grid place-items-center rounded-md hover:bg-zinc-800 transition text-zinc-400 flex-shrink-0"
+          >
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </header>
+        <pre id="templatePromptView"
+          class="flex-1 overflow-auto p-5 font-mono text-xs text-zinc-300 bg-zinc-950/50 leading-relaxed whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+
+    <!-- Dialogs manager modal -->
+    <div
+      id="dialogsModal"
+      class="hidden fixed inset-0 z-50 grid place-items-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-dialogs-close></div>
+      <div
+        class="relative w-full max-w-4xl h-[calc(100vh-2rem)] flex flex-col bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-up"
+      >
+        <header class="flex items-center justify-between gap-4 p-5 border-b border-zinc-800">
+          <div>
+            <h2 class="text-sm font-semibold flex items-center gap-2">
+              <i data-lucide="list-checks" class="w-4 h-4 text-sky-400"></i>
+              对话管理
+            </h2>
+            <p class="text-xs text-zinc-500 mt-0.5">查看 Telegram 全部对话 · 勾选后批量退群 / 退频道 / 清理私聊</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              id="dialogsReloadBtn"
+              type="button"
+              class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs font-medium rounded-md transition flex items-center gap-1.5"
+            >
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>重新拉取</span>
+            </button>
+            <button
+              data-dialogs-close
+              type="button"
+              class="w-8 h-8 grid place-items-center rounded-md hover:bg-zinc-800 transition text-zinc-400"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </header>
+
+        <div class="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
+          <div id="dialogTypeFilter" class="flex gap-0.5 p-1 bg-zinc-950 rounded-lg border border-zinc-800"></div>
+          <div class="flex-1 relative">
+            <i
+              data-lucide="search"
+              class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"
+            ></i>
+            <input
+              id="dialogSearch"
+              placeholder="搜索标题 / @username..."
+              class="w-full pl-9 pr-3 py-1.5 text-sm bg-zinc-950 border border-zinc-800 rounded-lg focus:border-sky-500/40 focus:outline-none focus:ring-2 focus:ring-sky-500/10 placeholder:text-zinc-600"
+            />
+          </div>
+          <button
+            id="dialogsSelectAllBtn"
+            type="button"
+            class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md transition whitespace-nowrap"
+          >
+            全选当前
+          </button>
+          <button
+            id="dialogsClearBtn"
+            type="button"
+            class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md transition whitespace-nowrap"
+          >
+            取消勾选
+          </button>
+        </div>
+
+        <div id="dialogsList" class="flex-1 overflow-auto p-3 space-y-1.5"></div>
+
+        <footer class="flex items-center justify-between p-4 border-t border-zinc-800 bg-zinc-950/40">
+          <div class="text-xs text-zinc-500">
+            <span id="dialogsSelectionCount">未选中</span>
+            <span class="mx-1.5 text-zinc-700">·</span>
+            <span id="dialogsTotalCount">0</span> 条对话
+          </div>
+          <button
+            id="dialogsBulkDeleteBtn"
+            type="button"
+            disabled
+            class="px-4 py-2 bg-rose-500 hover:bg-rose-400 text-white text-sm font-medium rounded-lg transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-rose-500/20"
+          >
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span>退出 / 删除选中</span>
+          </button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Toast host -->
+    <div
+      id="toastHost"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 space-y-2 pointer-events-none"
+      aria-live="polite"
+    ></div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="./app.js"></script>
   </body>
 </html>
