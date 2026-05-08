@@ -23,10 +23,10 @@ router = APIRouter()
 def _redact_account(a: TelegramAccount) -> dict[str, Any]:
     return {
         "id": str(a.id),
-        "telegram_user_id": a.telegram_user_id,
-        "phone_e164": a.phone_e164,
-        "account_display_name": a.account_display_name,
-        "account_username": a.account_username,
+        "telegram_user_id": "<redacted>",
+        "phone_e164": "<redacted>",
+        "account_display_name": "<redacted>",
+        "account_username": "<redacted>",
         "session_encrypted": "<redacted>",
         "status": a.status,
         "last_synced_at": a.last_synced_at,

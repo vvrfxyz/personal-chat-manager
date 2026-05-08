@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from openai import AsyncOpenAI
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,6 +79,100 @@ def _lock_for(binding_id: str) -> asyncio.Lock:
 # safe because the absolute worst case is a few extra fast runs.
 _consecutive_cap_hits: dict[str, int] = {}
 _MAX_FAST_RESCHEDULES = 3
+_CATCH_UP_INTERVAL = timedelta(minutes=2)
+_CATCH_UP_CADENCE_DELTAS: dict[str, timedelta] = {
+    "continuous": timedelta(seconds=0),
+    "every_2m": timedelta(minutes=2),
+    "slow_background": timedelta(minutes=15),
+}
+_CATCH_UP_BATCH_SIZES = {500, 1000, 2000}
+_CATCH_UP_RESULT_TYPES = {"archive_reports", "daily_digest", "latest_summary"}
+_CATCH_UP_FAILURE_POLICIES = {"pause", "retry_once", "skip_batch"}
+_FETCH_TIMEOUT_SECONDS = 10 * 60
+_SUMMARIZE_TIMEOUT_SECONDS = 45 * 60
+
+
+def _cursor_meta(cursor: SummaryCursor | None) -> dict[str, Any]:
+    if cursor is None:
+        return {}
+    return dict(cursor.cursor_metadata or {})
+
+
+def _catch_up_meta(cursor: SummaryCursor | None) -> dict[str, Any]:
+    meta = _cursor_meta(cursor).get("catch_up")
+    return dict(meta) if isinstance(meta, dict) else {}
+
+
+def _catch_up_config(cursor: SummaryCursor | None) -> dict[str, Any]:
+    meta = _catch_up_meta(cursor)
+    batch_size = int(meta.get("batch_size") or 500)
+    if batch_size not in _CATCH_UP_BATCH_SIZES:
+        batch_size = 500
+    cadence = str(meta.get("cadence") or "every_2m")
+    if cadence not in _CATCH_UP_CADENCE_DELTAS:
+        cadence = "every_2m"
+    result_type = str(meta.get("result_type") or "archive_reports")
+    if result_type not in _CATCH_UP_RESULT_TYPES:
+        result_type = "archive_reports"
+    failure_policy = str(meta.get("failure_policy") or "pause")
+    if failure_policy not in _CATCH_UP_FAILURE_POLICIES:
+        failure_policy = "pause"
+    return {
+        **meta,
+        "batch_size": batch_size,
+        "cadence": cadence,
+        "result_type": result_type,
+        "failure_policy": failure_policy,
+        "batches_completed": int(meta.get("batches_completed") or 0),
+        "failed_batches": int(meta.get("failed_batches") or 0),
+        "reports_generated": int(meta.get("reports_generated") or 0),
+        "tokens_used": int(meta.get("tokens_used") or 0),
+    }
+
+
+def _catch_up_active(cursor: SummaryCursor | None) -> bool:
+    return bool(_catch_up_meta(cursor).get("active"))
+
+
+def _set_catch_up_meta(cursor: SummaryCursor, patch: dict[str, Any] | None) -> None:
+    meta = _cursor_meta(cursor)
+    if patch is None:
+        meta.pop("catch_up", None)
+    else:
+        meta["catch_up"] = patch
+    cursor.cursor_metadata = meta
+
+
+def _normal_next_run(rule: SummaryRule | None, enabled: bool, now: datetime) -> datetime | None:
+    if rule is None or not enabled or rule.frequency == "manual":
+        return None
+    delta = frequency_delta(rule.frequency)
+    return (now + delta) if delta is not None else None
+
+
+def _catch_up_next_run_at(meta: dict[str, Any], now: datetime) -> datetime:
+    cadence = str(meta.get("cadence") or "every_2m")
+    return now + _CATCH_UP_CADENCE_DELTAS.get(cadence, _CATCH_UP_INTERVAL)
+
+
+def _catch_up_limit_reason(meta: dict[str, Any]) -> str | None:
+    max_batches = meta.get("max_batches")
+    if max_batches is not None and int(meta.get("batches_completed") or 0) >= int(max_batches):
+        return "max_batches"
+    max_tokens = meta.get("max_tokens")
+    if max_tokens is not None and int(meta.get("tokens_used") or 0) >= int(max_tokens):
+        return "max_tokens"
+    max_reports = meta.get("max_reports")
+    if max_reports is not None and int(meta.get("reports_generated") or 0) >= int(max_reports):
+        return "max_reports"
+    return None
+
+
+async def _await_with_timeout(awaitable, seconds: int, label: str):
+    try:
+        return await asyncio.wait_for(awaitable, timeout=seconds)
+    except TimeoutError as exc:
+        raise TimeoutError(f"{label} timed out after {seconds}s") from exc
 
 
 def _openai_client() -> AsyncOpenAI | None:
@@ -533,6 +627,7 @@ async def _summarize(
                     tc.function.name, args,
                     session=session, chat_uuid=chat_uuid,
                 )
+                await session.commit()
             convo.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -566,6 +661,33 @@ def _build_markdown(report: dict[str, Any]) -> str:
         + _list("Mentions", report.get("mentions", []))
         + _list("Links", report.get("links", []))
     )
+
+
+async def _summarize_daily_parts(
+    parts: list[dict[str, Any]],
+    language: str,
+    template_key: str,
+    *,
+    session: AsyncSession,
+    chat_uuid: uuid.UUID,
+) -> tuple[dict[str, Any], int, int]:
+    messages: list[FetchedMessage] = []
+    for idx, part in enumerate(parts, start=1):
+        date = datetime.fromisoformat(part["to_at"].replace("Z", "+00:00")) if part.get("to_at") else datetime.now(timezone.utc)
+        label = f"积压批次 {idx}"
+        covered = " - ".join(x for x in [part.get("from_at"), part.get("to_at")] if x)
+        text = f"{label}\n范围：{covered}\n\n{part.get('markdown') or ''}".strip()
+        messages.append(FetchedMessage(id=idx, date=date, sender="Personal Chat Manager", text=text))
+    payload, input_tokens, output_tokens = await _summarize(
+        messages,
+        language,
+        template_key,
+        carry_over_questions=[],
+        session=session,
+        chat_uuid=chat_uuid,
+    )
+    payload["title"] = f"积压合并日报 · {payload['title']}"
+    return payload, input_tokens, output_tokens
 
 
 _CARRY_OVER_LOOKBACK_REPORTS = 3
@@ -690,9 +812,11 @@ async def _execute_run_locked(
         select(SummaryCursor).where(SummaryCursor.user_chat_binding_id == binding.id)
     )
     cursor = cursor_q.scalar_one_or_none()
+    catch_up_active = _catch_up_active(cursor)
+    catch_up = _catch_up_config(cursor) if catch_up_active else {}
 
     language = (rule.preferred_language if rule else "zh-CN")
-    default_limit = rule.max_messages_per_run if rule else 500
+    default_limit = catch_up.get("batch_size") or (rule.max_messages_per_run if rule else 500)
 
     # Build the effective FetchSpec.
     if fetch_spec is None:
@@ -716,6 +840,7 @@ async def _execute_run_locked(
         if spec.limit <= 0:
             spec.limit = default_limit
 
+    binding.last_run_at = now
     run = SummaryRun(
         telegram_account_id=account.id,
         telegram_chat_id=chat.id,
@@ -727,13 +852,17 @@ async def _execute_run_locked(
     )
     session.add(run)
     await session.flush()
+    # Persist the running marker before network-heavy Telegram/OpenAI work.
+    # Otherwise a stuck external call leaves Postgres "idle in transaction"
+    # and the scheduler cannot reason about what is actually in flight.
+    await session.commit()
     logger.info(
         "run start binding=%s chat=%s trigger=%s run_id=%s advance=%s",
         binding.id, chat.title, trigger_source, run.id, spec.advance_cursor,
     )
 
-    binding.last_run_at = now
-
+    fetch_result: FetchResult | None = None
+    messages: list[FetchedMessage] = []
     try:
         session_string = decrypt(account.session_encrypted)
         logger.debug(
@@ -741,21 +870,29 @@ async def _execute_run_locked(
             chat.external_chat_id, chat.chat_type, spec.min_id, spec.max_id,
             spec.after_dt, spec.before_dt, spec.limit,
         )
-        fetch_result = await _fetch_messages(
-            session_string=session_string,
-            external_chat_id=chat.external_chat_id,
-            chat_type=chat.chat_type,
-            access_hash=chat.access_hash,
-            username=chat.username,
-            spec=spec,
-            session=session,
-            chat_uuid=chat.id,
+        fetch_result = await _await_with_timeout(
+            _fetch_messages(
+                session_string=session_string,
+                external_chat_id=chat.external_chat_id,
+                chat_type=chat.chat_type,
+                access_hash=chat.access_hash,
+                username=chat.username,
+                spec=spec,
+                session=session,
+                chat_uuid=chat.id,
+            ),
+            _FETCH_TIMEOUT_SECONDS,
+            "telegram fetch",
         )
         messages = fetch_result.messages
         logger.info(
             "run fetched %d messages hit_cap=%s last_raw_id=%s",
             len(messages), fetch_result.hit_cap, fetch_result.last_raw_id,
         )
+        # `_fetch_messages` upserts raw messages for later tool lookup. Commit
+        # those writes before the long OpenAI phase so we do not hold a DB
+        # transaction open while waiting on the network.
+        await session.commit()
 
         min_needed = rule.min_message_count if rule else 1
         if len(messages) < min_needed:
@@ -781,11 +918,17 @@ async def _execute_run_locked(
             # No new content → we've caught up. Clear any in-flight cap-hit
             # counter and align next_run_at with the normal cadence so we
             # don't keep polling on the fast 2-min cycle.
+            if spec.advance_cursor and catch_up_active and cursor is not None:
+                meta = _catch_up_config(cursor)
+                meta["active"] = False
+                meta["completed_at"] = datetime.now(timezone.utc).isoformat()
+                meta["stop_reason"] = "caught_up"
+                _set_catch_up_meta(cursor, meta)
             if spec.advance_cursor and rule and rule.frequency != "manual":
                 _consecutive_cap_hits.pop(str(binding.id), None)
-                delta = frequency_delta(rule.frequency)
-                if delta is not None:
-                    rule.next_run_at = datetime.now(timezone.utc) + delta
+                rule.next_run_at = _normal_next_run(rule, binding.auto_summary_enabled, datetime.now(timezone.utc))
+            elif spec.advance_cursor and catch_up_active and rule:
+                rule.next_run_at = None
             await session.commit()
             return run, None
 
@@ -799,32 +942,57 @@ async def _execute_run_locked(
         carry_over_questions = await _gather_carry_over_questions(
             session, binding.id, template_key
         )
+        await session.commit()
 
-        payload, input_tokens, output_tokens = await _summarize(
-            messages, language, template_key,
-            carry_over_questions=carry_over_questions,
-            session=session,
-            chat_uuid=chat.id,
+        payload, input_tokens, output_tokens = await _await_with_timeout(
+            _summarize(
+                messages, language, template_key,
+                carry_over_questions=carry_over_questions,
+                session=session,
+                chat_uuid=chat.id,
+            ),
+            _SUMMARIZE_TIMEOUT_SECONDS,
+            "summary generation",
         )
         md = _build_markdown(payload)
 
-        report = SummaryReport(
-            summary_run_id=run.id,
-            user_chat_binding_id=binding.id,
-            title=payload["title"],
-            executive_summary=payload.get("executive_summary"),
-            key_points=payload.get("key_points", []),
-            decisions=payload.get("decisions", []),
-            action_items=payload.get("action_items", []),
-            risks=payload.get("risks", []),
-            mentions=payload.get("mentions", []),
-            links=payload.get("links", []),
-            content_markdown=md,
-            language=language,
-        )
-        session.add(report)
-
         last_msg = messages[-1]
+        report: SummaryReport | None = None
+        report_created = False
+        if catch_up_active and catch_up.get("result_type") == "daily_digest" and cursor is not None:
+            meta = _catch_up_config(cursor)
+            parts = meta.get("daily_parts")
+            if not isinstance(parts, list):
+                parts = []
+            parts.append({
+                "title": payload["title"],
+                "markdown": md,
+                "from_message_id": messages[0].id,
+                "to_message_id": last_msg.id,
+                "from_at": messages[0].date.isoformat(),
+                "to_at": last_msg.date.isoformat(),
+                "message_count": len(messages),
+            })
+            meta["daily_parts"] = parts
+            _set_catch_up_meta(cursor, meta)
+        else:
+            report = SummaryReport(
+                summary_run_id=run.id,
+                user_chat_binding_id=binding.id,
+                title=payload["title"],
+                executive_summary=payload.get("executive_summary"),
+                key_points=payload.get("key_points", []),
+                decisions=payload.get("decisions", []),
+                action_items=payload.get("action_items", []),
+                risks=payload.get("risks", []),
+                mentions=payload.get("mentions", []),
+                links=payload.get("links", []),
+                content_markdown=md,
+                language=language,
+            )
+            session.add(report)
+            await session.flush()
+            report_created = True
         # Advance cursor to the raw-last id so non-textual messages at the tail
         # don't get rescanned on the next run. Fall back to the last textual
         # message if, somehow, raw id wasn't tracked.
@@ -852,18 +1020,117 @@ async def _execute_run_locked(
         run.input_token_count = input_tokens
         run.output_token_count = output_tokens
         binding.last_success_at = now2
+        binding.last_error_at = None
+        binding.last_error_message = None
         logger.info(
             "run success run_id=%s in=%s out=%s model=%s advanced_cursor=%s hit_cap=%s",
             run.id, input_tokens, output_tokens, run.model_name,
             spec.advance_cursor, fetch_result.hit_cap,
         )
 
+        if spec.advance_cursor and catch_up_active and cursor is not None:
+            meta = _catch_up_config(cursor)
+            meta["batches_completed"] = int(meta.get("batches_completed") or 0) + 1
+            meta["tokens_used"] = int(meta.get("tokens_used") or 0) + input_tokens + output_tokens
+            meta["last_batch_at"] = now2.isoformat()
+            if report_created and report is not None:
+                meta["reports_generated"] = int(meta.get("reports_generated") or 0) + 1
+                report_ids = meta.get("report_ids")
+                if not isinstance(report_ids, list):
+                    report_ids = []
+                report_ids.append(str(report.id))
+                meta["report_ids"] = report_ids[-100:]
+
+            stop_reason = None if fetch_result.hit_cap else "caught_up"
+            limit_reason = _catch_up_limit_reason(meta)
+            if limit_reason is not None:
+                stop_reason = limit_reason
+
+            if stop_reason is None:
+                meta["active"] = True
+                _set_catch_up_meta(cursor, meta)
+                if rule is not None:
+                    rule.next_run_at = _catch_up_next_run_at(meta, now2)
+                logger.info(
+                    "catch-up continuing cadence=%s next=%s",
+                    meta.get("cadence"), rule.next_run_at if rule else None,
+                )
+            else:
+                meta["active"] = False
+                meta["stop_reason"] = stop_reason
+                meta["completed_at" if stop_reason == "caught_up" else "stopped_at"] = now2.isoformat()
+
+                if meta.get("result_type") == "daily_digest" and not report_created:
+                    parts = meta.get("daily_parts")
+                    if isinstance(parts, list) and parts:
+                        first_part = parts[0]
+                        last_part = parts[-1]
+                        try:
+                            run.covered_from_message_id = int(
+                                first_part.get("from_message_id") or run.covered_from_message_id or 0
+                            ) or run.covered_from_message_id
+                            run.covered_to_message_id = int(
+                                last_part.get("to_message_id") or run.covered_to_message_id or 0
+                            ) or run.covered_to_message_id
+                        except (TypeError, ValueError):
+                            pass
+                        if first_part.get("from_at"):
+                            run.covered_from_at = datetime.fromisoformat(
+                                str(first_part["from_at"]).replace("Z", "+00:00")
+                            )
+                        if last_part.get("to_at"):
+                            run.covered_to_at = datetime.fromisoformat(
+                                str(last_part["to_at"]).replace("Z", "+00:00")
+                            )
+                        run.fetched_message_count = sum(
+                            int(part.get("message_count") or 0)
+                            for part in parts
+                            if isinstance(part, dict)
+                        )
+                        digest_payload, digest_in, digest_out = await _await_with_timeout(
+                            _summarize_daily_parts(
+                                parts,
+                                language,
+                                template_key,
+                                session=session,
+                                chat_uuid=chat.id,
+                            ),
+                            _SUMMARIZE_TIMEOUT_SECONDS,
+                            "daily digest generation",
+                        )
+                        run.input_token_count = (run.input_token_count or 0) + digest_in
+                        run.output_token_count = (run.output_token_count or 0) + digest_out
+                        meta["tokens_used"] = int(meta.get("tokens_used") or 0) + digest_in + digest_out
+                        digest_md = _build_markdown(digest_payload)
+                        report = SummaryReport(
+                            summary_run_id=run.id,
+                            user_chat_binding_id=binding.id,
+                            title=digest_payload["title"],
+                            executive_summary=digest_payload.get("executive_summary"),
+                            key_points=digest_payload.get("key_points", []),
+                            decisions=digest_payload.get("decisions", []),
+                            action_items=digest_payload.get("action_items", []),
+                            risks=digest_payload.get("risks", []),
+                            mentions=digest_payload.get("mentions", []),
+                            links=digest_payload.get("links", []),
+                            content_markdown=digest_md,
+                            language=language,
+                        )
+                        session.add(report)
+                        await session.flush()
+                        meta["reports_generated"] = int(meta.get("reports_generated") or 0) + 1
+                    meta.pop("daily_parts", None)
+
+                _set_catch_up_meta(cursor, meta)
+                if rule is not None:
+                    rule.next_run_at = _normal_next_run(rule, binding.auto_summary_enabled, now2)
+                _consecutive_cap_hits.pop(str(binding.id), None)
         # next_run_at scheduling only when this was a cursor-advancing run.
         # If we capped out, a real backlog likely remains — reschedule soon so
         # we drain within minutes instead of waiting a full interval. But cap
         # the cascade at `_MAX_FAST_RESCHEDULES`: high-velocity chats that
         # exceed our capacity (msgs/cadence) would otherwise loop forever.
-        if spec.advance_cursor and rule and rule.frequency != "manual":
+        elif spec.advance_cursor and rule and rule.frequency != "manual":
             bid = str(binding.id)
             if fetch_result.hit_cap:
                 cap_count = _consecutive_cap_hits.get(bid, 0) + 1
@@ -885,6 +1152,11 @@ async def _execute_run_locked(
                         bid, cap_count, rule.frequency,
                     )
             else:
+                if catch_up_active and cursor is not None:
+                    meta = _catch_up_meta(cursor)
+                    meta["active"] = False
+                    meta["completed_at"] = now2.isoformat()
+                    _set_catch_up_meta(cursor, meta)
                 _consecutive_cap_hits.pop(bid, None)
                 delta = frequency_delta(rule.frequency)
                 if delta is not None:
@@ -893,18 +1165,52 @@ async def _execute_run_locked(
         await session.commit()
         return run, report
     except Exception as exc:  # noqa: BLE001
-        logger.exception("run failed: %s", exc)
+        error_text = str(exc) or exc.__class__.__name__
+        logger.exception("run failed: %s", error_text)
         now2 = datetime.now(timezone.utc)
         run.status = "failed"
         run.finished_at = now2
-        run.error_message = str(exc)[:2000]
+        run.error_message = error_text[:2000]
         # Tool-loop / LLM failures arrive wrapped so we can still persist
         # the tokens burned before the failure — cost stays visible.
         if isinstance(exc, SummarizeError):
             run.input_token_count = exc.total_in or None
             run.output_token_count = exc.total_out or None
         binding.last_error_at = now2
-        binding.last_error_message = str(exc)[:2000]
+        binding.last_error_message = error_text[:2000]
+        if spec.advance_cursor and catch_up_active and cursor is not None:
+            meta = _catch_up_config(cursor)
+            meta["failed_batches"] = int(meta.get("failed_batches") or 0) + 1
+            meta["tokens_used"] = (
+                int(meta.get("tokens_used") or 0)
+                + int(run.input_token_count or 0)
+                + int(run.output_token_count or 0)
+            )
+            meta["last_error_at"] = now2.isoformat()
+            meta["last_error_message"] = error_text[:500]
+            policy = str(meta.get("failure_policy") or "pause")
+            should_continue = False
+            if policy == "retry_once" and int(meta.get("failed_batches") or 0) <= 1:
+                should_continue = True
+            elif policy == "skip_batch" and fetch_result is not None and fetch_result.last_raw_id is not None:
+                cursor.last_message_id = fetch_result.last_raw_id
+                if messages:
+                    cursor.last_message_at = messages[-1].date
+                should_continue = True
+
+            if should_continue:
+                meta["active"] = True
+                meta["last_batch_at"] = now2.isoformat()
+                _set_catch_up_meta(cursor, meta)
+                if rule is not None:
+                    rule.next_run_at = _catch_up_next_run_at(meta, now2)
+            else:
+                meta["active"] = False
+                meta["stop_reason"] = "failed"
+                meta["stopped_at"] = now2.isoformat()
+                _set_catch_up_meta(cursor, meta)
+                if rule is not None:
+                    rule.next_run_at = _normal_next_run(rule, binding.auto_summary_enabled, now2)
         await session.commit()
         return run, None
 
@@ -917,12 +1223,18 @@ async def dispatch_due_runs() -> None:
             select(UserChatBinding.id, SummaryRule.frequency)
             .join(SummaryRule, SummaryRule.user_chat_binding_id == UserChatBinding.id)
             .join(TelegramChat, TelegramChat.id == UserChatBinding.telegram_chat_id)
+            .outerjoin(SummaryCursor, SummaryCursor.user_chat_binding_id == UserChatBinding.id)
             .where(
-                UserChatBinding.auto_summary_enabled.is_(True),
                 UserChatBinding.status == "active",
                 TelegramChat.is_active.is_(True),
-                SummaryRule.frequency != "manual",
                 (SummaryRule.next_run_at.is_(None)) | (SummaryRule.next_run_at <= now),
+                or_(
+                    and_(
+                        UserChatBinding.auto_summary_enabled.is_(True),
+                        SummaryRule.frequency != "manual",
+                    ),
+                    SummaryCursor.cursor_metadata["catch_up"]["active"].as_boolean().is_(True),
+                ),
             )
         )
         due = q.all()

@@ -4,7 +4,7 @@ Personal Chat Manager is a lightweight static prototype project for a personal c
 
 ## Live Demo
 
-https://vvrfxyz.github.io/personal-chat-manager/
+Configure GitHub Pages for your fork or deployment target.
 
 ## Project Description
 
@@ -24,11 +24,18 @@ Personal Chat Manager is a personal communication and productivity tool for orga
 
 ## Run Locally
 
-Open `index.html` directly in a browser, or serve the folder with a simple static server.
+Run the frontend dev server:
+
+```bash
+npm install
+npm run dev
+```
+
+Run the backend separately from `backend/`.
 
 ## Suggested Telegram API Fields
 
 - App title: `Personal Chat Manager`
 - Short name: `chatmanager`
-- URL: `https://vvrfxyz.github.io/personal-chat-manager/`
+- URL: `https://<your-github-username>.github.io/personal-chat-manager/`
 - Description: `A personal communication and productivity tool for organizing chats, reviewing conversation history, and improving message workflow efficiency.`

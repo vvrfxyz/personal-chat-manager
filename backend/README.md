@@ -4,13 +4,13 @@ Phase 1 MVP backend. Single-user, single Telegram account. Python 3.11+ / FastAP
 
 ## Setup
 
-Postgres + Redis are assumed running in OrbStack (container `postgres`, DB `personal_chat_manager`).
+Postgres is expected to be available locally, with the database from `.env`.
 
 ```bash
 cd backend
 uv sync
 cp .env.example .env   # edit ENCRYPTION_KEY and OPENAI_API_KEY
-psql "postgresql://postgres:wenruifeng@127.0.0.1:5432/personal_chat_manager" -f schema.sql
+psql "postgresql://postgres:postgres@127.0.0.1:5432/personal_chat_manager" -f schema.sql
 ```
 
 ## Run
@@ -53,7 +53,7 @@ Reports:
 Admin / inspector:
 
 - `GET /api/admin/health`
-- `GET /api/admin/db` — JSON snapshot of all tables (session_encrypted redacted)
+- `GET /api/admin/db` — JSON snapshot of all tables (sensitive account fields redacted)
 
 ## Scheduler
 
@@ -62,4 +62,4 @@ Admin / inspector:
 ## Security
 
 - Telegram session strings (and in-flight login sessions) encrypted with Fernet. Key is in `ENCRYPTION_KEY` — rotating the key invalidates bound accounts.
-- `admin/db` redacts `session_encrypted`.
+- `admin/db` redacts account identifiers and encrypted sessions.

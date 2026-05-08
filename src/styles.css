@@ -1,0 +1,524 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  background: #11100f;
+  color: #f6f1e8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --pcm-ink: #11100f;
+  --pcm-panel: #191816;
+  --pcm-panel-soft: #211f1b;
+  --pcm-border: rgba(246, 241, 232, 0.1);
+  --pcm-muted: #a9a196;
+  --pcm-teal: #2dd4bf;
+  --pcm-coral: #fb7185;
+  --pcm-amber: #fbbf24;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(135deg, #0f0e0d 0%, #17120f 46%, #11100f 100%);
+  background-size: 48px 48px, 48px 48px, cover;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.26);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(169, 161, 150, 0.22);
+  border: 2px solid var(--pcm-ink);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(169, 161, 150, 0.36);
+}
+
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.app-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(120deg, rgba(45, 212, 191, 0.08), transparent 30%),
+    linear-gradient(300deg, rgba(251, 113, 133, 0.08), transparent 32%),
+    repeating-linear-gradient(105deg, transparent 0 18px, rgba(246, 241, 232, 0.025) 18px 19px);
+  mask-image: linear-gradient(to bottom, black, rgba(0, 0, 0, 0.68));
+}
+
+.panel {
+  border: 1px solid var(--pcm-border);
+  background: color-mix(in srgb, var(--pcm-panel) 88%, transparent);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+}
+
+.panel-soft {
+  border: 1px solid var(--pcm-border);
+  background: color-mix(in srgb, var(--pcm-panel-soft) 76%, transparent);
+}
+
+.glass-rail {
+  border-bottom: 1px solid var(--pcm-border);
+  background: rgba(17, 16, 15, 0.84);
+  backdrop-filter: blur(18px);
+}
+
+.brand-mark {
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.9), rgba(251, 191, 36, 0.84)),
+    linear-gradient(90deg, #17120f, #17120f);
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.text-muted {
+  color: var(--pcm-muted);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 1024px) {
+  .workspace-grid {
+    grid-template-columns: 352px minmax(0, 1fr);
+    gap: 22px;
+  }
+}
+
+.chat-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 104px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.025);
+  box-sizing: border-box;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.chat-row:hover {
+  border-color: rgba(45, 212, 191, 0.32);
+  background: rgba(45, 212, 191, 0.055);
+  transform: translateY(-1px);
+}
+
+.chat-row.is-active {
+  border-color: rgba(45, 212, 191, 0.55);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(251, 191, 36, 0.06));
+}
+
+.metric-cell {
+  display: flex;
+  min-height: 94px;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.metric-cell.is-loading {
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.052), rgba(255, 255, 255, 0.02));
+}
+
+.metric-value {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.metric-value.text-coral {
+  color: var(--pcm-coral);
+}
+
+.metric-hint {
+  min-height: 1rem;
+}
+
+.backlog-panel {
+  display: grid;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(251, 113, 133, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(251, 113, 133, 0.095), rgba(251, 191, 36, 0.04)),
+    rgba(255, 255, 255, 0.024);
+  padding: 14px;
+}
+
+.backlog-panel.is-active {
+  border-color: rgba(45, 212, 191, 0.28);
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.09), rgba(251, 191, 36, 0.04)),
+    rgba(255, 255, 255, 0.024);
+}
+
+.backlog-stat {
+  min-width: 0;
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  border-radius: 8px;
+  background: rgba(17, 16, 15, 0.28);
+  padding: 9px 10px;
+}
+
+.backlog-advanced {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid rgba(246, 241, 232, 0.08);
+  padding-top: 12px;
+}
+
+.backlog-advanced-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.backlog-control-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.backlog-limit-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.backlog-control {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.backlog-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.backlog-option {
+  min-height: 42px;
+  min-width: 0;
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.022);
+  color: rgb(246, 241, 232);
+  cursor: pointer;
+  padding: 8px 9px;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.backlog-option span,
+.backlog-option small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.backlog-option span {
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.backlog-option small {
+  margin-top: 3px;
+  color: rgb(150, 143, 132);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.backlog-option:hover:not(:disabled),
+.backlog-option.is-selected {
+  border-color: rgba(45, 212, 191, 0.38);
+  background: rgba(45, 212, 191, 0.105);
+  color: rgb(204, 251, 241);
+}
+
+.backlog-option:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.backlog-number-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.backlog-number-field input {
+  min-height: 42px;
+  min-width: 0;
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.022);
+  color: rgb(246, 241, 232);
+  font: inherit;
+  outline: none;
+  padding: 0 11px;
+}
+
+.backlog-number-field input:focus {
+  border-color: rgba(45, 212, 191, 0.45);
+}
+
+.backlog-number-field input:disabled {
+  opacity: 0.58;
+}
+
+.backlog-choice {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px;
+}
+
+@media (min-width: 900px) {
+  .backlog-panel {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .backlog-advanced-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .backlog-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .backlog-limit-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .backlog-segmented {
+    grid-template-columns: 1fr;
+  }
+
+  .backlog-choice {
+    flex-wrap: wrap;
+  }
+
+  .backlog-choice > :last-child {
+    width: 100%;
+  }
+}
+
+.report-row {
+  border: 1px solid rgba(246, 241, 232, 0.08);
+  background: rgba(255, 255, 255, 0.022);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.report-row:hover,
+.report-row.is-active {
+  border-color: rgba(251, 191, 36, 0.38);
+  background: rgba(251, 191, 36, 0.055);
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.clamp-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.reader-modal {
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.035), transparent 22%),
+    #191816;
+}
+
+.reader-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid rgba(246, 241, 232, 0.1);
+  padding: 22px;
+}
+
+.reader-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px 22px;
+}
+
+.reader-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.reader-section {
+  border: 1px solid rgba(246, 241, 232, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.026);
+  padding: 15px;
+}
+
+.reader-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: #f6f1e8;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.reader-section h4 svg {
+  color: var(--pcm-teal);
+}
+
+.reader-section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reader-section li {
+  color: var(--pcm-muted);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.reader-markdown {
+  border: 1px solid rgba(246, 241, 232, 0.09);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.reader-markdown pre {
+  max-height: 42vh;
+  margin: 0;
+  overflow: auto;
+  padding: 18px;
+  color: #e9e1d4;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.78rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.reader-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(246, 241, 232, 0.1);
+  padding: 14px 18px;
+}
+
+@media (max-width: 720px) {
+  .reader-header {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .reader-body {
+    padding: 14px 18px 18px;
+  }
+}
+
+.fade-in {
+  animation: fade-in 280ms ease both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}

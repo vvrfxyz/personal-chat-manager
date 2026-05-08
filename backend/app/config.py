@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_base_url: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-5.5"
     openai_reasoning_effort: str = ""  # "", "minimal", "low", "medium", "high"
 
     cors_origins: str = ""

@@ -3,5 +3,6 @@
 __pycache__/
 *.pyc
 sessions/
+logs/
 .ruff_cache/
 .pytest_cache/
